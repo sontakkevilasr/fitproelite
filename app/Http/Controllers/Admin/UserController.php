@@ -132,7 +132,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'phone' => ['nullable', 'string', 'max:30'],
-            'password' => [$user ? 'nullable' : 'required', 'min:8'],
+            'password' => [$user ? 'nullable' : 'required', 'min:8', 'max:255'],
             'role' => ['required', Rule::in(['admin', 'counsellor', 'trainer'])],
             'trainer_category_id' => ['required_if:role,trainer', 'nullable', 'exists:trainer_categories,id'],
             'bio' => ['nullable', 'string'],

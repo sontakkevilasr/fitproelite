@@ -23,7 +23,7 @@ class BookingController extends Controller
 
     public function selectCategory(string $type, Client $client)
     {
-        $trialType = $this->authorizeType($type);
+        $trialType = $this->authorize($type, $client);
 
         if ($trialType === Trial::TYPE_PRE_VISIT) {
             $category = TrainerCategory::where('is_assessment_category', true)->where('is_active', true)->first();
@@ -40,7 +40,7 @@ class BookingController extends Controller
 
     public function selectTrainer(Request $request, string $type, Client $client)
     {
-        $this->authorizeType($type);
+        $this->authorize($type, $client);
 
         $categoryId = $request->integer('category_id');
         $category = TrainerCategory::findOrFail($categoryId);
@@ -55,7 +55,7 @@ class BookingController extends Controller
 
     public function calendar(string $type, Client $client, TrainerProfile $trainerProfile)
     {
-        $this->authorizeType($type);
+        $this->authorize($type, $client);
         $trainerProfile->load('user', 'category');
 
         return view('booking.calendar', [
@@ -68,7 +68,7 @@ class BookingController extends Controller
 
     public function slots(Request $request, string $type, Client $client, TrainerProfile $trainerProfile)
     {
-        $this->authorizeType($type);
+        $this->authorize($type, $client);
 
         $from = Carbon::parse($request->query('start', now()));
         $to = Carbon::parse($request->query('end', now()->addWeeks(2)));
@@ -78,7 +78,7 @@ class BookingController extends Controller
 
     public function suggestSessions(Request $request, string $type, Client $client, TrainerProfile $trainerProfile)
     {
-        $this->authorizeType($type);
+        $this->authorize($type, $client);
         abort_unless($type === 'free-trial', 404);
 
         $validated = $request->validate([
@@ -98,7 +98,7 @@ class BookingController extends Controller
 
     public function store(Request $request, string $type, Client $client, TrainerProfile $trainerProfile)
     {
-        $trialType = $this->authorizeType($type);
+        $trialType = $this->authorize($type, $client);
         $expected = $trialType === Trial::TYPE_PRE_VISIT ? 1 : 3;
 
         $validated = $request->validate([
@@ -130,7 +130,13 @@ class BookingController extends Controller
             ->with('status', 'Free trial booked successfully for '.$client->name.'.');
     }
 
-    private function authorizeType(string $type): string
+    /**
+     * Counsellors and assessment trainers are trusted internal staff sharing
+     * one client pool (any of them may need to pick up someone else's lead
+     * for a follow-up call or booking) — so this only gates by role/type,
+     * not by who created the client or filled in their assessment.
+     */
+    private function authorize(string $type, Client $client): string
     {
         $user = Auth::user();
 

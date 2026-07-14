@@ -1,9 +1,15 @@
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
+        Options -MultiViews -Indexes +FollowSymLinks
     </IfModule>
 
     RewriteEngine On
+
+    # Force HTTPS — uncomment once an SSL certificate is active for this subdomain.
+    # Leave this off until you've confirmed HTTPS works, or you can lock yourself
+    # out with a redirect loop.
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
@@ -22,4 +28,56 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+# =====================================================================
+# Security hardening
+# =====================================================================
+
+Options -Indexes +FollowSymLinks
+ServerSignature Off
+
+# Block dotfiles (.env if ever misplaced here, .git, editor swap files, etc.)
+<FilesMatch "^\.">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Only index.php may ever execute — blocks any PHP file that ends up here
+# some other way (e.g. via a compromised upload path).
+<FilesMatch "^(?!index\.php$).*\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+    # Uncomment once HTTPS is confirmed working. Tells browsers to only ever
+    # use HTTPS for this subdomain from now on — hard to undo, so verify
+    # HTTPS first (see the RewriteCond %{HTTPS} block above).
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # Dynamic pages: never let a browser/proxy cache a stale authenticated view
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-cache, private, must-revalidate"
+    </FilesMatch>
+
+    # Vite fingerprints build asset filenames, so these are safe to cache hard
+    <FilesMatch "\.(css|js|woff2?|ttf|svg|png|jpe?g|gif|ico)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
 </IfModule>

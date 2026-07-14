@@ -15,6 +15,7 @@
 /node_modules
 /public/build
 /public/hot
+/public/.htaccess
 /public/storage
 /storage/*.key
 /storage/pail
@@ -22,3 +23,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.htaccess
+DEPLOYMENT.md
+_storage-link-once.php
+_storage-diagnose.php
+_storage-link-fix.php
+build-assets.zip

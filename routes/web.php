@@ -25,10 +25,28 @@ use App\Http\Controllers\Trainer\BlockedSlotController;
 use App\Http\Controllers\Trainer\CalendarController as TrainerCalendarController;
 use App\Http\Controllers\Trainer\SessionController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
     return redirect()->route(auth()->check() ? 'dashboard' : 'login');
 });
+
+// Serves the public storage disk (trainer photos) directly through PHP instead
+// of relying on the public/storage symlink. Some shared hosts (this app has
+// been deployed to a LiteSpeed/CageFS host where this is the case) restrict
+// or silently break symlink-following in ways `php artisan storage:link`
+// and .htaccess FollowSymLinks can't work around. This route is a drop-in
+// replacement — it matches the exact URL shape `asset('storage/...')`
+// already generates, so no other code needed to change.
+Route::get('/storage/{path}', function (string $path) {
+    try {
+        abort_unless(Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->response($path);
+    } catch (\League\Flysystem\PathTraversalDetected $e) {
+        abort(404);
+    }
+})->where('path', '.*')->name('storage.public.serve');
 
 Route::get('/trainers/{trainer}/profile', [PublicTrainerProfileController::class, 'show'])->name('trainers.public-profile');
 
@@ -86,7 +104,7 @@ Route::middleware(['auth', 'role:trainer'])->prefix('trainer')->name('trainer.')
 
 Route::middleware(['auth', 'role:counsellor'])->prefix('counsellor')->name('counsellor.')->group(function () {
     Route::get('lookup', [LookupController::class, 'index'])->name('lookup.index');
-    Route::get('lookup/search', [LookupController::class, 'search'])->name('lookup.search');
+    Route::get('lookup/search', [LookupController::class, 'search'])->middleware('throttle:30,1')->name('lookup.search');
 
     Route::get('clients', [CounsellorClientController::class, 'index'])->name('clients.index');
     Route::post('clients', [CounsellorClientController::class, 'store'])->name('clients.store');
