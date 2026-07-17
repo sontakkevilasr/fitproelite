@@ -144,6 +144,62 @@ class SlotAvailabilityService
         return $fallback;
     }
 
+    /**
+     * Search free slots across MULTIPLE trainers at once, ranked by how close
+     * they land to a counsellor's requested day/time — built for the "caller
+     * asked for Wednesday afternoon" scenario where browsing each trainer's
+     * calendar one by one is too slow for a live call.
+     *
+     * Searches the preferred date first, then subsequent days, stopping once
+     * enough candidates are found. Within a day: closest to $preferredTime if
+     * given, otherwise earliest first.
+     *
+     * @param  Collection<int, TrainerProfile>  $trainers
+     * @return array<int, array{trainer: TrainerProfile, date: string, start: string, end: string, day_offset: int}>
+     */
+    public function nearestSlotsAcrossTrainers(
+        Collection $trainers,
+        Carbon $preferredDate,
+        ?string $preferredTime = null,
+        int $daysToSearch = 14,
+        int $limit = 6,
+    ): array {
+        $preferredMinutes = $preferredTime ? Carbon::parse($preferredTime)->hour * 60 + Carbon::parse($preferredTime)->minute : null;
+        $candidates = collect();
+
+        for ($dayOffset = 0; $dayOffset < $daysToSearch; $dayOffset++) {
+            $date = $preferredDate->copy()->addDays($dayOffset);
+
+            foreach ($trainers as $trainer) {
+                foreach ($this->freeSlotsForDate($trainer, $date) as $slot) {
+                    $slotMinutes = Carbon::parse($slot['start'])->hour * 60 + Carbon::parse($slot['start'])->minute;
+
+                    $candidates->push([
+                        'trainer' => $trainer,
+                        'date' => $date->format('Y-m-d'),
+                        'start' => $slot['start'],
+                        'end' => $slot['end'],
+                        'day_offset' => $dayOffset,
+                        'sort_key' => $preferredMinutes !== null ? abs($slotMinutes - $preferredMinutes) : $slotMinutes,
+                    ]);
+                }
+            }
+
+            // Once we have a healthy pool of candidates and have looked at
+            // least one day past the preferred one, stop searching further
+            // out — no need to scan two weeks if day 0-1 already has plenty.
+            if ($candidates->count() >= $limit * 3 && $dayOffset >= 1) {
+                break;
+            }
+        }
+
+        return $candidates
+            ->sortBy([['day_offset', 'asc'], ['sort_key', 'asc']])
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
     private function blockedRangesForDate(TrainerProfile $trainer, Carbon $date): Collection
     {
         return $trainer->blockedSlots()->whereDate('block_date', $date->format('Y-m-d'))->get();

@@ -124,6 +124,7 @@ Route::middleware(['auth'])
     ->group(function () {
         Route::get('category', [BookingController::class, 'selectCategory'])->name('category');
         Route::get('trainers', [BookingController::class, 'selectTrainer'])->name('trainers');
+        Route::get('trainers/quick-suggest', [BookingController::class, 'quickSuggest'])->name('trainers.quick-suggest');
         Route::get('trainers/{trainerProfile}/calendar', [BookingController::class, 'calendar'])->name('calendar');
         Route::get('trainers/{trainerProfile}/slots', [BookingController::class, 'slots'])->name('slots');
         Route::post('trainers/{trainerProfile}/suggest', [BookingController::class, 'suggestSessions'])->name('suggest');

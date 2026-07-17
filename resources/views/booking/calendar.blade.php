@@ -83,6 +83,27 @@
                 sessions: Array.from({ length: sessionsNeeded }, () => null),
                 activeIndex: 0,
 
+                init() {
+                    // Arrived here from the "quick suggest" screen with a slot
+                    // already picked out (e.g. session 1 of a free trial) —
+                    // pre-fill it and immediately fetch suggestions for the
+                    // rest, same as if the user had clicked that calendar cell.
+                    const params = new URLSearchParams(window.location.search);
+                    const date = params.get('preselect_date');
+                    const start = params.get('preselect_start');
+                    const end = params.get('preselect_end');
+
+                    if (date && start && end) {
+                        this.sessions[0] = { date, start, end };
+
+                        if (this.type === 'free-trial' && this.sessionsNeeded === 3) {
+                            this.fetchSuggestions(date, start);
+                        } else {
+                            this.advanceActiveIndex();
+                        }
+                    }
+                },
+
                 onEventClick({ event }) {
                     if (event.extendedProps.type !== 'free') return;
 

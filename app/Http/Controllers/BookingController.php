@@ -53,6 +53,47 @@ class BookingController extends Controller
         return view('booking.select-trainer', compact('type', 'client', 'category', 'trainers'));
     }
 
+    /**
+     * "Caller asked for Wednesday afternoon" — search every trainer in this
+     * category at once and return the nearest free slots, ranked by how
+     * close they land to the requested day/time. Built for speed on a live
+     * call: no need to open each trainer's calendar one by one.
+     */
+    public function quickSuggest(Request $request, string $type, Client $client)
+    {
+        $this->authorize($type, $client);
+
+        $validated = $request->validate([
+            'category_id' => ['required', 'exists:trainer_categories,id'],
+            'date' => ['required', 'date'],
+            'time' => ['nullable', 'date_format:H:i'],
+        ]);
+
+        $trainers = TrainerProfile::with('user')
+            ->where('trainer_category_id', $validated['category_id'])
+            ->where('is_active', true)
+            ->get();
+
+        $suggestions = $this->availability->nearestSlotsAcrossTrainers(
+            trainers: $trainers,
+            preferredDate: Carbon::parse($validated['date']),
+            preferredTime: $validated['time'] ?? null,
+        );
+
+        return response()->json([
+            'suggestions' => collect($suggestions)->map(fn ($s) => [
+                'trainer_id' => $s['trainer']->id,
+                'trainer_name' => $s['trainer']->user->name,
+                'trainer_photo' => $s['trainer']->photoUrl(),
+                'date' => $s['date'],
+                'date_label' => Carbon::parse($s['date'])->isToday() ? 'Today' : (Carbon::parse($s['date'])->isTomorrow() ? 'Tomorrow' : Carbon::parse($s['date'])->format('D, d M')),
+                'start' => $s['start'],
+                'end' => $s['end'],
+                'start_label' => Carbon::parse($s['start'])->format('g:i A'),
+            ])->values(),
+        ]);
+    }
+
     public function calendar(string $type, Client $client, TrainerProfile $trainerProfile)
     {
         $this->authorize($type, $client);
