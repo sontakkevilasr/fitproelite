@@ -9,9 +9,9 @@
         <div
             x-data="quickSuggest({
                 suggestUrl: @js(route('booking.trainers.quick-suggest', ['type' => $type, 'client' => $client, 'category_id' => $category->id])),
-                calendarBaseUrl: @js(route('booking.calendar', ['type' => $type, 'client' => $client, 'trainerProfile' => '__TRAINER__'])),
+                calendarBaseUrl: @js(route('booking.calendar', ['type' => $type, 'client' => $client, 'trainerProfile' => '__TRAINER__', 'category_id' => $category->id])),
                 storeBaseUrl: @js(route('booking.store', ['type' => $type, 'client' => $client, 'trainerProfile' => '__TRAINER__'])),
-                sessionsNeeded: {{ $type === 'pre-visit' ? 1 : 3 }},
+                sessionsNeeded: {{ $sessionsNeeded }},
             })"
             class="mb-8"
         >
@@ -69,7 +69,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($trainers as $trainer)
-                <a href="{{ route('booking.calendar', ['type' => $type, 'client' => $client, 'trainerProfile' => $trainer]) }}">
+                <a href="{{ route('booking.calendar', ['type' => $type, 'client' => $client, 'trainerProfile' => $trainer, 'category_id' => $category->id]) }}">
                     <x-card class="hover:border-primary-300 transition h-full">
                         <div class="flex items-center gap-3">
                             @if($trainer->photoUrl())
@@ -165,8 +165,11 @@
                         // Free trial: 3 sessions needed — hand off to the calendar page
                         // with this slot pre-selected as session 1, so sessions 2/3 get
                         // auto-suggested immediately instead of starting from scratch.
-                        const params = new URLSearchParams({ preselect_date: s.date, preselect_start: s.start, preselect_end: s.end });
-                        window.location = config.calendarBaseUrl.replace('__TRAINER__', s.trainer_id) + '?' + params.toString();
+                        const url = new URL(config.calendarBaseUrl.replace('__TRAINER__', s.trainer_id), window.location.origin);
+                        url.searchParams.set('preselect_date', s.date);
+                        url.searchParams.set('preselect_start', s.start);
+                        url.searchParams.set('preselect_end', s.end);
+                        window.location = url.toString();
                     }
                 },
             };

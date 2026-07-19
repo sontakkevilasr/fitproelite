@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-page-header :title="$trainer->user->name" :subtitle="$trainer->category->name">
+        <x-page-header :title="$trainer->user->name" :subtitle="$trainer->categories->pluck('name')->join(', ') ?: '—'">
             <x-slot name="actions">
                 <a href="{{ route('admin.users.edit', $trainer->user) }}">
                     <x-secondary-button>Edit User</x-secondary-button>

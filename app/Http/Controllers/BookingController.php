@@ -40,17 +40,121 @@ class BookingController extends Controller
 
     public function selectTrainer(Request $request, string $type, Client $client)
     {
-        $this->authorize($type, $client);
+        $trialType = $this->authorize($type, $client);
 
         $categoryId = $request->integer('category_id');
         $category = TrainerCategory::findOrFail($categoryId);
 
         $trainers = TrainerProfile::with('user')
-            ->where('trainer_category_id', $categoryId)
+            ->whereHas('categories', fn ($q) => $q->where('trainer_categories.id', $categoryId))
             ->where('is_active', true)
             ->get();
 
-        return view('booking.select-trainer', compact('type', 'client', 'category', 'trainers'));
+        $sessionsNeeded = $trialType === Trial::TYPE_PRE_VISIT ? 1 : $this->sessionsNeededFor($client, $category);
+
+        return view('booking.select-trainer', compact('type', 'client', 'category', 'trainers', 'sessionsNeeded'));
+    }
+
+    /**
+     * After an assessment is saved, show every open slot across the
+     * package's linked categories, as a selectable card — instead of the
+     * system pre-deciding who gets which session. The assessment trainer
+     * picks whichever combination of cards they want, up to the package's
+     * trial-session count; it's fine if that ends up all with one trainer,
+     * or spread across several/different categories or times.
+     */
+    public function plan(Request $request, string $type, Client $client)
+    {
+        $this->authorize($type, $client);
+        abort_unless($type === 'free-trial', 404);
+
+        $from = $request->filled('from') ? Carbon::parse($request->query('from')) : now();
+        $to = $request->filled('to') ? Carbon::parse($request->query('to')) : $from->copy()->addDays(7);
+
+        $package = $client->package;
+        $maxSessions = $package?->trial_sessions_count ?? 0;
+        $categories = $package?->trainerCategories()->orderByPivot('sessions', 'desc')->get() ?? collect();
+
+        $sections = $categories->map(function (TrainerCategory $category) use ($from, $to) {
+            $trainers = TrainerProfile::with('user')
+                ->whereHas('categories', fn ($q) => $q->where('trainer_categories.id', $category->id))
+                ->where('is_active', true)
+                ->get();
+
+            $cards = collect();
+            foreach ($trainers as $trainer) {
+                foreach ($this->availability->freeSlotsInRange($trainer, $from, $to) as $slot) {
+                    $cards->push(['category' => $category, 'trainer' => $trainer, ...$slot]);
+                }
+            }
+
+            $cards = $cards->sortBy(['date', 'start'])->values();
+
+            return ['category' => $category, 'cards' => $cards];
+        });
+
+        return view('booking.plan', [
+            'type' => $type,
+            'client' => $client,
+            'package' => $package,
+            'sections' => $sections,
+            'maxSessions' => $maxSessions,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+        ]);
+    }
+
+    /**
+     * Books whichever cards the assessment trainer selected on the
+     * suggestions screen — each can carry a different trainer and/or
+     * category, capped at the package's trial-session count as a ceiling
+     * (not a fixed requirement, so booking fewer now is fine).
+     */
+    public function bookPlan(Request $request, string $type, Client $client)
+    {
+        $this->authorize($type, $client);
+        abort_unless($type === 'free-trial', 404);
+
+        $maxSessions = $client->package?->trial_sessions_count ?? 0;
+
+        $validated = $request->validate([
+            'sessions' => ['required', 'array', 'min:1', 'max:'.max($maxSessions, 1)],
+            'sessions.*.trainer_profile_id' => ['required', 'exists:trainer_profiles,id'],
+            'sessions.*.category_id' => ['required', 'exists:trainer_categories,id'],
+            'sessions.*.date' => ['required', 'date'],
+            'sessions.*.start' => ['required', 'date_format:H:i'],
+            'sessions.*.end' => ['required', 'date_format:H:i'],
+        ]);
+
+        $packageCategoryIds = $client->package?->trainerCategories()->pluck('trainer_categories.id') ?? collect();
+
+        foreach ($validated['sessions'] as $slot) {
+            abort_unless($packageCategoryIds->contains($slot['category_id']), 404);
+
+            $belongs = TrainerProfile::whereKey($slot['trainer_profile_id'])
+                ->whereHas('categories', fn ($q) => $q->where('trainer_categories.id', $slot['category_id']))
+                ->exists();
+
+            abort_unless($belongs, 404);
+        }
+
+        $primaryCategory = TrainerCategory::findOrFail($validated['sessions'][0]['category_id']);
+
+        try {
+            $trial = $this->booking->bookTrial(
+                client: $client,
+                category: $primaryCategory,
+                bookedBy: Auth::user(),
+                type: Trial::TYPE_FREE_TRIAL,
+                sessionSlots: $validated['sessions'],
+                expectedSessions: count($validated['sessions']),
+            );
+        } catch (SlotUnavailableException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('trainer.free-trials.show', $trial)
+            ->with('status', 'Free trial booked successfully for '.$client->name.'.');
     }
 
     /**
@@ -70,7 +174,7 @@ class BookingController extends Controller
         ]);
 
         $trainers = TrainerProfile::with('user')
-            ->where('trainer_category_id', $validated['category_id'])
+            ->whereHas('categories', fn ($q) => $q->where('trainer_categories.id', $validated['category_id']))
             ->where('is_active', true)
             ->get();
 
@@ -94,16 +198,26 @@ class BookingController extends Controller
         ]);
     }
 
-    public function calendar(string $type, Client $client, TrainerProfile $trainerProfile)
+    public function calendar(Request $request, string $type, Client $client, TrainerProfile $trainerProfile)
     {
-        $this->authorize($type, $client);
-        $trainerProfile->load('user', 'category');
+        $trialType = $this->authorize($type, $client);
+        $trainerProfile->load('user', 'categories');
+
+        $categoryId = null;
+        $sessionsNeeded = 1;
+        if ($trialType === Trial::TYPE_FREE_TRIAL) {
+            $categoryId = $request->integer('category_id');
+            $category = $trainerProfile->categories->firstWhere('id', $categoryId);
+            abort_unless($category, 404);
+            $sessionsNeeded = $this->sessionsNeededFor($client, $category);
+        }
 
         return view('booking.calendar', [
             'type' => $type,
             'client' => $client,
             'trainer' => $trainerProfile,
-            'sessionsNeeded' => $type === 'pre-visit' ? 1 : 3,
+            'categoryId' => $categoryId,
+            'sessionsNeeded' => $sessionsNeeded,
         ]);
     }
 
@@ -125,22 +239,43 @@ class BookingController extends Controller
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'start' => ['required', 'date_format:H:i'],
+            'category_id' => ['required', 'exists:trainer_categories,id'],
         ]);
 
-        $session1Date = Carbon::parse($validated['date']);
-        $session2 = $this->availability->nextFreeSlot($trainerProfile, $session1Date, $validated['start']);
+        $category = TrainerCategory::findOrFail($validated['category_id']);
+        $sessionsNeeded = $this->sessionsNeededFor($client, $category);
 
-        $session3 = $session2
-            ? $this->availability->nextFreeSlot($trainerProfile, Carbon::parse($session2['date']), $validated['start'])
-            : null;
+        $sessions = [];
+        $afterDate = Carbon::parse($validated['date']);
+        $preferredStart = $validated['start'];
 
-        return response()->json(['session2' => $session2, 'session3' => $session3]);
+        for ($i = 1; $i < $sessionsNeeded; $i++) {
+            $next = $this->availability->nextFreeSlot($trainerProfile, $afterDate, $preferredStart);
+
+            if (! $next) {
+                break;
+            }
+
+            $sessions[] = $next;
+            $afterDate = Carbon::parse($next['date']);
+        }
+
+        return response()->json(['sessions' => $sessions]);
     }
 
     public function store(Request $request, string $type, Client $client, TrainerProfile $trainerProfile)
     {
         $trialType = $this->authorize($type, $client);
-        $expected = $trialType === Trial::TYPE_PRE_VISIT ? 1 : 3;
+
+        if ($trialType === Trial::TYPE_PRE_VISIT) {
+            $category = TrainerCategory::where('is_assessment_category', true)->firstOrFail();
+            $expected = 1;
+        } else {
+            $categoryId = $request->integer('category_id');
+            abort_unless($trainerProfile->categories->contains('id', $categoryId), 404);
+            $category = TrainerCategory::findOrFail($categoryId);
+            $expected = $this->sessionsNeededFor($client, $category);
+        }
 
         $validated = $request->validate([
             'sessions' => ['required', 'array', 'size:'.$expected],
@@ -149,14 +284,18 @@ class BookingController extends Controller
             'sessions.*.end' => ['required', 'date_format:H:i'],
         ]);
 
+        $sessionSlots = collect($validated['sessions'])
+            ->map(fn (array $slot) => [...$slot, 'trainer_profile_id' => $trainerProfile->id])
+            ->all();
+
         try {
             $trial = $this->booking->bookTrial(
                 client: $client,
-                trainer: $trainerProfile,
-                category: $trainerProfile->category,
+                category: $category,
                 bookedBy: Auth::user(),
                 type: $trialType,
-                sessionSlots: $validated['sessions'],
+                sessionSlots: $sessionSlots,
+                expectedSessions: $expected,
             );
         } catch (SlotUnavailableException $e) {
             return back()->withErrors(['sessions' => $e->getMessage()]);
@@ -167,8 +306,22 @@ class BookingController extends Controller
                 ->with('status', 'Pre-trial visit booked successfully.');
         }
 
-        return redirect()->route('trainer.calendar.index')
+        return redirect()->route('trainer.free-trials.show', $trial)
             ->with('status', 'Free trial booked successfully for '.$client->name.'.');
+    }
+
+    /**
+     * How many free trial sessions a given category should get for this
+     * client, per their package's trial-session split. Falls back to 3 (the
+     * old fixed default) when the client has no package, or the package has
+     * no split covering this category — e.g. an assessment trainer browsing
+     * a category manually that isn't part of the recommended package.
+     */
+    private function sessionsNeededFor(Client $client, TrainerCategory $category): int
+    {
+        $row = $client->package?->trialSessionPlan()->first(fn (array $row) => $row['category']->id === $category->id);
+
+        return $row['sessions'] ?? 3;
     }
 
     /**
@@ -188,7 +341,7 @@ class BookingController extends Controller
         }
 
         if ($type === 'free-trial') {
-            abort_unless($user->hasRole('trainer') && $user->trainerProfile?->category?->is_assessment_category, 403);
+            abort_unless($user->hasRole('trainer') && $user->trainerProfile?->isAssessmentTrainer(), 403);
 
             return Trial::TYPE_FREE_TRIAL;
         }

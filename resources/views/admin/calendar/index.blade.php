@@ -12,7 +12,7 @@
         </select>
         <select name="trainer_id" class="border-gray-300 focus:border-primary-500 focus:ring-primary-500 rounded-md shadow-sm text-sm" onchange="this.form.submit()">
             @forelse($trainers as $trainer)
-                <option value="{{ $trainer->id }}" @selected(optional($selectedTrainer)->id === $trainer->id)>{{ $trainer->user->name }} ({{ $trainer->category->name }})</option>
+                <option value="{{ $trainer->id }}" @selected(optional($selectedTrainer)->id === $trainer->id)>{{ $trainer->user->name }} ({{ $trainer->categories->pluck('name')->join(', ') ?: '—' }})</option>
             @empty
                 <option value="">No trainers</option>
             @endforelse

@@ -18,6 +18,7 @@ class TrialSession extends Model
     protected $fillable = [
         'trial_id',
         'trainer_profile_id',
+        'trainer_category_id',
         'session_number',
         'session_date',
         'start_time',
@@ -42,6 +43,11 @@ class TrialSession extends Model
     public function trainerProfile(): BelongsTo
     {
         return $this->belongsTo(TrainerProfile::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(TrainerCategory::class, 'trainer_category_id');
     }
 
     public function markedBy(): BelongsTo

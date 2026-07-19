@@ -48,17 +48,21 @@
                     <img src="{{ $user->trainerProfile->photoUrl() }}" alt="{{ $user->name }}" class="h-16 w-16 rounded-full object-cover">
                 @endif
 
+                @php
+                    $selectedCategoryIds = old('trainer_category_ids', $user->trainerProfile?->categories->pluck('id')->all() ?? []);
+                @endphp
                 <div>
-                    <x-input-label for="trainer_category_id" value="Trainer category" />
-                    <x-select-input id="trainer_category_id" name="trainer_category_id" class="mt-1">
-                        <option value="">Select a category</option>
+                    <x-input-label value="Trainer categories" />
+                    <p class="text-xs text-gray-400 mt-0.5">A trainer can be assigned to more than one category.</p>
+                    <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         @foreach($categories as $category)
-                            <option value="{{ $category->id }}" @selected(old('trainer_category_id', $user->trainerProfile?->trainer_category_id) == $category->id)>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <x-checkbox name="trainer_category_ids[]" value="{{ $category->id }}" :checked="in_array($category->id, $selectedCategoryIds)" />
                                 {{ $category->name }}{{ $category->is_assessment_category ? ' (Assessment)' : '' }}
-                            </option>
+                            </label>
                         @endforeach
-                    </x-select-input>
-                    <x-input-error :messages="$errors->get('trainer_category_id')" class="mt-2" />
+                    </div>
+                    <x-input-error :messages="$errors->get('trainer_category_ids')" class="mt-2" />
                 </div>
 
                 <div>

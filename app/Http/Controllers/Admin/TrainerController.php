@@ -11,8 +11,8 @@ class TrainerController extends Controller
 {
     public function index(Request $request)
     {
-        $trainers = TrainerProfile::with('user', 'category')
-            ->when($request->filled('category_id'), fn ($q) => $q->where('trainer_category_id', $request->integer('category_id')))
+        $trainers = TrainerProfile::with('user', 'categories')
+            ->when($request->filled('category_id'), fn ($q) => $q->whereHas('categories', fn ($q) => $q->where('trainer_categories.id', $request->integer('category_id'))))
             ->whereHas('user')
             ->get()
             ->sortBy(fn ($trainer) => $trainer->user->name);
@@ -24,7 +24,7 @@ class TrainerController extends Controller
 
     public function show(TrainerProfile $trainer)
     {
-        $trainer->load('user', 'category', 'weeklySlots', 'blockedSlots');
+        $trainer->load('user', 'categories', 'weeklySlots', 'blockedSlots');
 
         return view('admin.trainers.show', compact('trainer'));
     }

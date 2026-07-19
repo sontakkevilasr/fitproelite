@@ -23,6 +23,10 @@
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Name</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Price</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Week type</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Sessions</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">No. of trial sessions</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Type of trainer</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Status</th>
                             <th class="px-4 py-3"></th>
                         </tr>
@@ -32,9 +36,27 @@
                             <tr>
                                 <td class="px-4 py-3">
                                     <div class="font-medium text-gray-900">{{ $package->name }}</div>
-                                    <div class="text-gray-500">{{ Str::limit($package->description, 60) }}</div>
+                                    @if($package->description)
+                                        <x-tooltip :text="$package->description">
+                                            <span class="text-gray-500 cursor-help border-b border-dotted border-gray-300">{{ Str::limit($package->description, 60) }}</span>
+                                        </x-tooltip>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3">{{ $package->price !== null ? '₹'.number_format($package->price, 0) : '—' }}</td>
+                                <td class="px-4 py-3">{{ $package->week_days }} days/wk</td>
+                                <td class="px-4 py-3">{{ $package->sessions_count ?? '—' }}{{ $package->sessions_count ? '/month' : '' }}</td>
+                                <td class="px-4 py-3">{{ $package->trial_sessions_count ?? '—' }}</td>
+                                <td class="px-4 py-3">
+                                    @if($package->trainerCategories->isEmpty())
+                                        <span class="text-gray-400">—</span>
+                                    @else
+                                        <div class="flex flex-col gap-0.5">
+                                            @foreach($package->trainerCategories as $category)
+                                                <span>{{ $category->name }} <span class="text-gray-400">({{ $category->pivot->sessions }})</span></span>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3">
                                     <x-status-badge :status="$package->is_active ? 'active' : 'inactive'" />
                                 </td>

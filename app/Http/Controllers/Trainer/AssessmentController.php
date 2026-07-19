@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Trainer;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientAssessment;
+use App\Models\Package;
 use App\Models\TrainerCategory;
 use App\Models\Trial;
 use Illuminate\Http\Request;
@@ -17,11 +18,15 @@ class AssessmentController extends Controller
         $this->authorize($trial);
 
         $categories = TrainerCategory::where('is_assessment_category', false)->where('is_active', true)->orderBy('name')->get();
+        $packages = Package::where('is_active', true)->orderBy('name')->get();
+
+        $trial->load('client.package', 'client.interestLevel', 'client.calls');
 
         return view('trainer.assessments.create', [
             'trial' => $trial,
             'client' => $trial->client,
             'categories' => $categories,
+            'packages' => $packages,
             'objectives' => ClientAssessment::OBJECTIVES,
         ]);
     }
@@ -31,6 +36,7 @@ class AssessmentController extends Controller
         $this->authorize($trial);
 
         $validated = $request->validate([
+            'package_id' => ['nullable', 'exists:packages,id'],
             'first_time_gym' => ['sometimes', 'boolean'],
             'workout_objective' => ['required', 'string', 'in:'.implode(',', array_keys(ClientAssessment::OBJECTIVES))],
             'medical_conditions' => ['nullable', 'string'],
@@ -39,6 +45,8 @@ class AssessmentController extends Controller
         ]);
 
         $validated['first_time_gym'] = $request->boolean('first_time_gym');
+        $packageId = $validated['package_id'] ?? null;
+        unset($validated['package_id']);
 
         ClientAssessment::create([
             ...$validated,
@@ -47,10 +55,13 @@ class AssessmentController extends Controller
             'filled_by' => Auth::id(),
         ]);
 
-        $trial->client->update(['status' => Client::STATUS_ASSESSMENT_COMPLETED]);
+        $trial->client->update([
+            'status' => Client::STATUS_ASSESSMENT_COMPLETED,
+            ...($packageId ? ['package_id' => $packageId] : []),
+        ]);
 
-        return redirect()->route('booking.category', ['type' => 'free-trial', 'client' => $trial->client])
-            ->with('status', 'Assessment saved. Now book the free trial with the right trainer.');
+        return redirect()->route('booking.plan', ['type' => 'free-trial', 'client' => $trial->client])
+            ->with('status', 'Assessment saved. Here are trial suggestions based on their package.');
     }
 
     private function authorize(Trial $trial): void

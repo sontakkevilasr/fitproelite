@@ -1,27 +1,24 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-page-header title="My Trials" subtitle="Pre-trial visits and free trials for your clients." />
+        <x-page-header title="Free Trials" subtitle="Every free trial you've booked." />
     </x-slot>
 
-    <form method="GET" class="mb-4">
-        <select name="type" class="border-gray-300 focus:border-primary-500 focus:ring-primary-500 rounded-md shadow-sm text-sm" onchange="this.form.submit()">
-            <option value="">All types</option>
-            <option value="pre_visit" @selected(request('type') === 'pre_visit')>Pre-Trial Visit</option>
-            <option value="free_trial" @selected(request('type') === 'free_trial')>Free Trial</option>
-        </select>
-    </form>
+    @if(session('status'))
+        <div class="mb-4 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3">{{ session('status') }}</div>
+    @endif
 
     <x-card :padded="false">
         @if($trials->isEmpty())
-            <x-empty-state title="No trials found" />
+            <x-empty-state title="No free trials booked yet" description="Free trials you book after an assessment will show up here." />
         @else
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Client</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Type</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Trainer</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Sessions</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Trainer(s)</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">Categories</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Status</th>
                             <th class="px-4 py-3"></th>
                         </tr>
@@ -30,11 +27,12 @@
                         @foreach($trials as $trial)
                             <tr>
                                 <td class="px-4 py-3 font-medium text-gray-900">{{ $trial->client->name }}</td>
-                                <td class="px-4 py-3">{{ $trial->type === 'pre_visit' ? 'Pre-Trial Visit' : 'Free Trial' }}</td>
+                                <td class="px-4 py-3">{{ $trial->sessions->count() }} of {{ $trial->total_sessions }}</td>
                                 <td class="px-4 py-3">{{ $trial->sessions->pluck('trainerProfile.user.name')->unique()->join(', ') }}</td>
+                                <td class="px-4 py-3">{{ $trial->sessions->pluck('category.name')->unique()->join(', ') }}</td>
                                 <td class="px-4 py-3"><x-status-badge :status="$trial->status" /></td>
                                 <td class="px-4 py-3 text-right">
-                                    <a href="{{ route('counsellor.clients.show', $trial->client) }}" class="text-primary-600 hover:text-primary-800 font-medium">View</a>
+                                    <a href="{{ route('trainer.free-trials.show', $trial) }}" class="text-primary-600 hover:text-primary-800 font-medium">View</a>
                                 </td>
                             </tr>
                         @endforeach

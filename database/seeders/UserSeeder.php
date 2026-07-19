@@ -48,12 +48,12 @@ class UserSeeder extends Seeder
             $profile = TrainerProfile::firstOrCreate(
                 ['user_id' => $user->id],
                 [
-                    'trainer_category_id' => $category->id,
                     'bio' => $seed['name'].' is an experienced '.$seed['category'].' trainer.',
                     'session_duration_minutes' => 60,
                     'is_active' => true,
                 ]
             );
+            $profile->categories()->syncWithoutDetaching([$category->id]);
 
             if ($profile->weeklySlots()->count() === 0) {
                 foreach (range(1, 5) as $day) { // Mon-Fri

@@ -14,8 +14,8 @@ class CalendarController extends Controller
     public function index(Request $request)
     {
         $categories = TrainerCategory::orderBy('name')->get();
-        $trainers = TrainerProfile::with('user', 'category')
-            ->when($request->filled('category_id'), fn ($q) => $q->where('trainer_category_id', $request->integer('category_id')))
+        $trainers = TrainerProfile::with('user', 'categories')
+            ->when($request->filled('category_id'), fn ($q) => $q->whereHas('categories', fn ($q) => $q->where('trainer_categories.id', $request->integer('category_id'))))
             ->get()
             ->sortBy(fn ($trainer) => $trainer->user->name);
 

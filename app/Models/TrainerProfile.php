@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainerProfile extends Model
@@ -13,7 +14,6 @@ class TrainerProfile extends Model
 
     protected $fillable = [
         'user_id',
-        'trainer_category_id',
         'photo_path',
         'bio',
         'phone',
@@ -33,9 +33,14 @@ class TrainerProfile extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function category(): BelongsTo
+    public function categories(): BelongsToMany
     {
-        return $this->belongsTo(TrainerCategory::class, 'trainer_category_id');
+        return $this->belongsToMany(TrainerCategory::class, 'trainer_category_trainer_profile');
+    }
+
+    public function isAssessmentTrainer(): bool
+    {
+        return $this->categories->contains('is_assessment_category', true);
     }
 
     public function weeklySlots(): HasMany

@@ -38,7 +38,7 @@
                             <tr>
                                 <td class="px-4 py-3 font-medium text-gray-900">{{ $trial->client->name }}</td>
                                 <td class="px-4 py-3">{{ $trial->type === 'pre_visit' ? 'Pre-Trial Visit' : 'Free Trial' }}</td>
-                                <td class="px-4 py-3">{{ $trial->trainerProfile->user->name }}</td>
+                                <td class="px-4 py-3">{{ $trial->sessions->pluck('trainerProfile.user.name')->unique()->join(', ') }}</td>
                                 <td class="px-4 py-3">{{ $trial->counsellor->name }}</td>
                                 <td class="px-4 py-3"><x-status-badge :status="$trial->status" /></td>
                                 <td class="px-4 py-3 text-right">

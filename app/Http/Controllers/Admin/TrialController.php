@@ -10,7 +10,7 @@ class TrialController extends Controller
 {
     public function index(Request $request)
     {
-        $trials = Trial::with('client', 'trainerProfile.user', 'category', 'counsellor')
+        $trials = Trial::with('client', 'sessions.trainerProfile.user', 'sessions.category', 'counsellor', 'bookedBy')
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderByDesc('created_at')
@@ -22,7 +22,7 @@ class TrialController extends Controller
 
     public function show(Trial $trial)
     {
-        $trial->load('client', 'trainerProfile.user', 'category', 'counsellor', 'sessions', 'assessment');
+        $trial->load('client', 'sessions.trainerProfile.user', 'sessions.category', 'counsellor', 'bookedBy', 'assessment');
 
         return view('admin.trials.show', compact('trial'));
     }

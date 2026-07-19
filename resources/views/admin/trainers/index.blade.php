@@ -31,7 +31,7 @@
                             @endif
                             <div>
                                 <p class="font-semibold text-gray-900">{{ $trainer->user->name }}</p>
-                                <p class="text-sm text-gray-500">{{ $trainer->category->name }}</p>
+                                <p class="text-sm text-gray-500">{{ $trainer->categories->pluck('name')->join(', ') ?: '—' }}</p>
                             </div>
                         </div>
                         <p class="mt-3 text-sm text-gray-500">{{ Str::limit($trainer->bio, 90) }}</p>

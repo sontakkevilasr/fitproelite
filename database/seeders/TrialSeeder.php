@@ -22,9 +22,9 @@ class TrialSeeder extends Seeder
         }
 
         $counsellor = User::role('counsellor')->first();
-        $assessmentTrainer = TrainerProfile::whereHas('category', fn ($q) => $q->where('is_assessment_category', true))->first();
-        $functionalTrainer = TrainerProfile::whereHas('category', fn ($q) => $q->where('name', 'Functional Training'))->first();
-        $yogaTrainer = TrainerProfile::whereHas('category', fn ($q) => $q->where('name', 'Yoga'))->first();
+        $assessmentTrainer = TrainerProfile::whereHas('categories', fn ($q) => $q->where('is_assessment_category', true))->with('categories')->first();
+        $functionalTrainer = TrainerProfile::whereHas('categories', fn ($q) => $q->where('name', 'Functional Training'))->with('categories')->first();
+        $yogaTrainer = TrainerProfile::whereHas('categories', fn ($q) => $q->where('name', 'Yoga'))->with('categories')->first();
 
         if (! $counsellor || ! $assessmentTrainer || ! $functionalTrainer) {
             return;
@@ -43,7 +43,7 @@ class TrialSeeder extends Seeder
             'trainer_profile_id' => $assessmentTrainer->id,
             'counsellor_id' => $counsellor->id,
             'booked_by_user_id' => $counsellor->id,
-            'trainer_category_id' => $assessmentTrainer->trainer_category_id,
+            'trainer_category_id' => $assessmentTrainer->categories->firstWhere('is_assessment_category', true)->id,
             'type' => Trial::TYPE_PRE_VISIT,
             'total_sessions' => 1,
             'status' => Trial::STATUS_COMPLETED,
@@ -63,7 +63,7 @@ class TrialSeeder extends Seeder
             'first_time_gym' => true,
             'workout_objective' => 'weight_loss',
             'notes' => 'Motivated, no injuries.',
-            'recommended_category_id' => $functionalTrainer->trainer_category_id,
+            'recommended_category_id' => $functionalTrainer->categories->first()->id,
             'filled_by' => $assessmentTrainer->user_id,
         ]);
 
@@ -72,7 +72,7 @@ class TrialSeeder extends Seeder
             'trainer_profile_id' => $functionalTrainer->id,
             'counsellor_id' => $counsellor->id,
             'booked_by_user_id' => $assessmentTrainer->user_id,
-            'trainer_category_id' => $functionalTrainer->trainer_category_id,
+            'trainer_category_id' => $functionalTrainer->categories->first()->id,
             'type' => Trial::TYPE_FREE_TRIAL,
             'total_sessions' => 3,
             'status' => Trial::STATUS_CONVERTED,
@@ -99,7 +99,7 @@ class TrialSeeder extends Seeder
                 'trainer_profile_id' => $yogaTrainer->id,
                 'counsellor_id' => $counsellor->id,
                 'booked_by_user_id' => $assessmentTrainer->user_id,
-                'trainer_category_id' => $yogaTrainer->trainer_category_id,
+                'trainer_category_id' => $yogaTrainer->categories->first()->id,
                 'type' => Trial::TYPE_FREE_TRIAL,
                 'total_sessions' => 3,
                 'status' => Trial::STATUS_LOST,
@@ -127,11 +127,11 @@ class TrialSeeder extends Seeder
         if ($slot) {
             app(TrialBookingService::class)->bookTrial(
                 client: $upcoming,
-                trainer: $assessmentTrainer,
-                category: $assessmentTrainer->category,
+                category: $assessmentTrainer->categories->firstWhere('is_assessment_category', true),
                 bookedBy: $counsellor,
                 type: Trial::TYPE_PRE_VISIT,
-                sessionSlots: [['date' => now()->addDays(2)->format('Y-m-d'), 'start' => $slot['start'], 'end' => $slot['end']]],
+                sessionSlots: [['trainer_profile_id' => $assessmentTrainer->id, 'date' => now()->addDays(2)->format('Y-m-d'), 'start' => $slot['start'], 'end' => $slot['end']]],
+                expectedSessions: 1,
             );
         }
     }

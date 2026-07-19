@@ -12,8 +12,8 @@
             <h3 class="font-semibold text-gray-900 mb-3">Overview</h3>
             <dl class="space-y-2 text-sm">
                 <div class="flex justify-between"><dt class="text-gray-500">Client</dt><dd>{{ $trial->client->name }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">Trainer</dt><dd>{{ $trial->trainerProfile->user->name }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500">Category</dt><dd>{{ $trial->category->name }}</dd></div>
+                <div class="flex justify-between gap-4"><dt class="text-gray-500 shrink-0">Trainer(s)</dt><dd class="text-right">{{ $trial->sessions->pluck('trainerProfile.user.name')->unique()->join(', ') }}</dd></div>
+                <div class="flex justify-between gap-4"><dt class="text-gray-500 shrink-0">Categories</dt><dd class="text-right">{{ $trial->sessions->pluck('category.name')->unique()->join(', ') }}</dd></div>
                 <div class="flex justify-between"><dt class="text-gray-500">Counsellor</dt><dd>{{ $trial->counsellor->name }}</dd></div>
                 <div class="flex justify-between"><dt class="text-gray-500">Booked by</dt><dd>{{ $trial->bookedBy->name }}</dd></div>
             </dl>
@@ -27,7 +27,10 @@
             <ul class="space-y-2 text-sm">
                 @foreach($trial->sessions as $session)
                     <li class="flex items-center justify-between border-b border-gray-100 pb-2 last:border-0">
-                        <span>{{ $session->session_date->format('d M Y') }} at {{ \Carbon\Carbon::parse($session->start_time)->format('g:i A') }}</span>
+                        <span>
+                            {{ $session->session_date->format('d M Y') }} at {{ \Carbon\Carbon::parse($session->start_time)->format('g:i A') }}
+                            <span class="text-gray-400">&middot; {{ $session->trainerProfile->user->name }} &middot; {{ $session->category?->name ?? '—' }}</span>
+                        </span>
                         <x-status-badge :status="$session->status" />
                     </li>
                 @endforeach

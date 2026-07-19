@@ -13,7 +13,7 @@ class TrialController extends Controller
 {
     public function index(Request $request)
     {
-        $trials = Trial::with('client', 'trainerProfile.user', 'category')
+        $trials = Trial::with('client', 'sessions.trainerProfile.user')
             ->where('counsellor_id', Auth::id())
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
             ->orderByDesc('created_at')

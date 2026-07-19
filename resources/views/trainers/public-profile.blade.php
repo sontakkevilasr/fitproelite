@@ -20,7 +20,7 @@
                 @endif
 
                 <h1 class="mt-4 text-xl font-semibold text-gray-900">{{ $trainer->user->name }}</h1>
-                <p class="text-primary-600 font-medium">{{ $trainer->category->name }}</p>
+                <p class="text-primary-600 font-medium">{{ $trainer->categories->pluck('name')->join(', ') ?: '—' }}</p>
 
                 @if($trainer->bio)
                     <p class="mt-4 text-sm text-gray-600">{{ $trainer->bio }}</p>

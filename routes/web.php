@@ -23,6 +23,7 @@ use App\Http\Controllers\Trainer\AssessmentController;
 use App\Http\Controllers\Trainer\AvailabilityController;
 use App\Http\Controllers\Trainer\BlockedSlotController;
 use App\Http\Controllers\Trainer\CalendarController as TrainerCalendarController;
+use App\Http\Controllers\Trainer\FreeTrialController;
 use App\Http\Controllers\Trainer\SessionController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -100,6 +101,11 @@ Route::middleware(['auth', 'role:trainer'])->prefix('trainer')->name('trainer.')
 
     Route::get('assessments/{trial}/create', [AssessmentController::class, 'create'])->name('assessments.create');
     Route::post('assessments/{trial}', [AssessmentController::class, 'store'])->name('assessments.store');
+
+    Route::get('free-trials', [FreeTrialController::class, 'index'])->name('free-trials.index');
+    Route::get('free-trials/{trial}', [FreeTrialController::class, 'show'])->name('free-trials.show');
+    Route::patch('free-trials/sessions/{trialSession}', [FreeTrialController::class, 'updateSession'])->name('free-trials.sessions.update');
+    Route::post('free-trials/{trial}/resend-notification', [FreeTrialController::class, 'resendNotification'])->name('free-trials.resend-notification');
 });
 
 Route::middleware(['auth', 'role:counsellor'])->prefix('counsellor')->name('counsellor.')->group(function () {
@@ -123,6 +129,8 @@ Route::middleware(['auth'])
     ->name('booking.')
     ->group(function () {
         Route::get('category', [BookingController::class, 'selectCategory'])->name('category');
+        Route::get('plan', [BookingController::class, 'plan'])->name('plan');
+        Route::post('plan/book', [BookingController::class, 'bookPlan'])->name('plan.book');
         Route::get('trainers', [BookingController::class, 'selectTrainer'])->name('trainers');
         Route::get('trainers/quick-suggest', [BookingController::class, 'quickSuggest'])->name('trainers.quick-suggest');
         Route::get('trainers/{trainerProfile}/calendar', [BookingController::class, 'calendar'])->name('calendar');

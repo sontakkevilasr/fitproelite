@@ -17,7 +17,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $users = User::query()
-            ->with('roles', 'trainerProfile.category')
+            ->with('roles', 'trainerProfile.categories')
             ->when($request->filled('role'), fn ($q) => $q->role($request->string('role')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $search = $request->string('search');
@@ -58,15 +58,16 @@ class UserController extends Controller
                     ? $request->file('photo')->store('trainer-photos', 'public')
                     : null;
 
-                TrainerProfile::create([
+                $profile = TrainerProfile::create([
                     'user_id' => $user->id,
-                    'trainer_category_id' => $validated['trainer_category_id'],
                     'photo_path' => $photoPath,
                     'bio' => $validated['bio'] ?? null,
                     'phone' => $validated['phone'] ?? null,
                     'session_duration_minutes' => $validated['session_duration_minutes'] ?? 60,
                     'is_active' => true,
                 ]);
+
+                $profile->categories()->sync($validated['trainer_category_ids']);
             }
 
             return $user;
@@ -77,7 +78,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $user->load('roles', 'trainerProfile');
+        $user->load('roles', 'trainerProfile.categories');
         $categories = TrainerCategory::where('is_active', true)->orderBy('name')->get();
 
         return view('admin.users.edit', compact('user', 'categories'));
@@ -108,11 +109,11 @@ class UserController extends Controller
                     $profile->photo_path = $request->file('photo')->store('trainer-photos', 'public');
                 }
 
-                $profile->trainer_category_id = $validated['trainer_category_id'];
                 $profile->bio = $validated['bio'] ?? null;
                 $profile->phone = $validated['phone'] ?? null;
                 $profile->session_duration_minutes = $validated['session_duration_minutes'] ?? 60;
                 $profile->save();
+                $profile->categories()->sync($validated['trainer_category_ids']);
             }
         });
 
@@ -134,7 +135,8 @@ class UserController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'password' => [$user ? 'nullable' : 'required', 'min:8', 'max:255'],
             'role' => ['required', Rule::in(['admin', 'counsellor', 'trainer'])],
-            'trainer_category_id' => ['required_if:role,trainer', 'nullable', 'exists:trainer_categories,id'],
+            'trainer_category_ids' => ['required_if:role,trainer', 'array'],
+            'trainer_category_ids.*' => ['exists:trainer_categories,id'],
             'bio' => ['nullable', 'string'],
             'session_duration_minutes' => ['nullable', 'integer', 'min:15', 'max:180'],
             'photo' => ['nullable', 'image', 'max:2048'],

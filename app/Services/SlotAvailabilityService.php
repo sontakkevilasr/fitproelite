@@ -200,6 +200,26 @@ class SlotAvailabilityService
             ->all();
     }
 
+    /**
+     * Every free slot for one trainer across an entire date range (inclusive)
+     * — used to build one selectable card per slot in the free-trial picker,
+     * rather than just their single soonest opening.
+     *
+     * @return array<int, array{date: string, start: string, end: string}>
+     */
+    public function freeSlotsInRange(TrainerProfile $trainer, Carbon $from, Carbon $to): array
+    {
+        $slots = [];
+
+        foreach (CarbonPeriod::create($from->copy()->startOfDay(), $to->copy()->startOfDay()) as $date) {
+            foreach ($this->freeSlotsForDate($trainer, $date) as $slot) {
+                $slots[] = ['date' => $date->format('Y-m-d'), 'start' => $slot['start'], 'end' => $slot['end']];
+            }
+        }
+
+        return $slots;
+    }
+
     private function blockedRangesForDate(TrainerProfile $trainer, Carbon $date): Collection
     {
         return $trainer->blockedSlots()->whereDate('block_date', $date->format('Y-m-d'))->get();

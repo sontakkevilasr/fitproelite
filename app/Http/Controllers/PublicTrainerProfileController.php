@@ -8,7 +8,7 @@ class PublicTrainerProfileController extends Controller
 {
     public function show(TrainerProfile $trainer)
     {
-        $trainer->load('user', 'category');
+        $trainer->load('user', 'categories');
 
         return view('trainers.public-profile', compact('trainer'));
     }

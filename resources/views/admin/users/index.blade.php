@@ -48,7 +48,7 @@
                                     <div class="text-gray-500">{{ $user->email }}</div>
                                 </td>
                                 <td class="px-4 py-3 capitalize">{{ $user->roles->pluck('name')->first() ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $user->trainerProfile?->category?->name ?? '—' }}</td>
+                                <td class="px-4 py-3">{{ $user->trainerProfile?->categories->pluck('name')->join(', ') ?: '—' }}</td>
                                 <td class="px-4 py-3">
                                     <x-status-badge :status="$user->is_active ? 'active' : 'inactive'" />
                                 </td>

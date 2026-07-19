@@ -14,6 +14,7 @@
     <div
         data-type="{{ $type }}"
         data-sessions-needed="{{ $sessionsNeeded }}"
+        data-category-id="{{ $categoryId }}"
         data-suggest-url="{{ route('booking.suggest', ['type' => $type, 'client' => $client, 'trainerProfile' => $trainer]) }}"
         x-data="bookingCalendar($el.dataset)"
         class="grid grid-cols-1 lg:grid-cols-3 gap-6"
@@ -54,7 +55,7 @@
                     </div>
                 </template>
 
-                <form method="POST" action="{{ route('booking.store', ['type' => $type, 'client' => $client, 'trainerProfile' => $trainer]) }}">
+                <form method="POST" action="{{ route('booking.store', ['type' => $type, 'client' => $client, 'trainerProfile' => $trainer, 'category_id' => $categoryId]) }}">
                     @csrf
                     <template x-for="(session, i) in sessions" :key="'fields-' + i">
                         <span>
@@ -79,6 +80,7 @@
             return {
                 type: config.type,
                 sessionsNeeded,
+                categoryId: config.categoryId,
                 suggestUrl: config.suggestUrl,
                 sessions: Array.from({ length: sessionsNeeded }, () => null),
                 activeIndex: 0,
@@ -96,7 +98,7 @@
                     if (date && start && end) {
                         this.sessions[0] = { date, start, end };
 
-                        if (this.type === 'free-trial' && this.sessionsNeeded === 3) {
+                        if (this.type === 'free-trial' && this.sessionsNeeded > 1) {
                             this.fetchSuggestions(date, start);
                         } else {
                             this.advanceActiveIndex();
@@ -116,7 +118,7 @@
 
                     this.sessions[this.activeIndex] = { date, start: startTime, end: endTime };
 
-                    if (this.type === 'free-trial' && this.activeIndex === 0 && this.sessionsNeeded === 3) {
+                    if (this.type === 'free-trial' && this.activeIndex === 0 && this.sessionsNeeded > 1) {
                         this.fetchSuggestions(date, startTime);
                     } else {
                         this.advanceActiveIndex();
@@ -131,16 +133,16 @@
                             'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
                             Accept: 'application/json',
                         },
-                        body: JSON.stringify({ date, start }),
+                        body: JSON.stringify({ date, start, category_id: this.categoryId }),
                     })
                         .then((r) => r.json())
                         .then((data) => {
-                            if (data.session2 && this.sessions[1] === null) {
-                                this.sessions[1] = { date: data.session2.date, start: data.session2.start, end: data.session2.end };
-                            }
-                            if (data.session3 && this.sessions[2] === null) {
-                                this.sessions[2] = { date: data.session3.date, start: data.session3.start, end: data.session3.end };
-                            }
+                            (data.sessions || []).forEach((slot, i) => {
+                                const target = i + 1; // index 0 is the slot the user just clicked
+                                if (this.sessions[target] === null) {
+                                    this.sessions[target] = { date: slot.date, start: slot.start, end: slot.end };
+                                }
+                            });
                             this.advanceActiveIndex();
                         });
                 },
